@@ -32,3 +32,12 @@ source "lib/Kconfig.debug"
 source "Documentation/Kconfig"
 
 source "io_uring/Kconfig"
+
+# Hallon kernel project toggles.
+config HALLON_BACKPORTS
+	bool "Hallon driver backports"
+	help
+	  Enable drivers and features backported from newer kernels to the
+	  Hallon kernel.
+
+	  Say N to keep the kernel upstream-clean.
