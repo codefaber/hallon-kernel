@@ -32,13 +32,11 @@ if test $# -gt 0 -o ! -d "$srctree"; then
 	usage
 fi
 
+# version string from CONFIG_LOCALVERSION
+config_localversion=$(sed -n 's/^CONFIG_LOCALVERSION=\(.*\)$/\1/p' include/config/auto.conf)
+
 try_tag() {
 	tag="$1"
-
-	# Is $tag an annotated tag?
-	if [ "$(git cat-file -t "$tag" 2> /dev/null)" != tag ]; then
-		 return
-	fi
 
 	# Is it an ancestor of HEAD, and if so, how many commits are in $tag..HEAD?
 	# shellcheck disable=SC2046 # word splitting is the point here
@@ -84,7 +82,7 @@ scm_version()
 
 	# mainline kernel:  6.2.0-rc5  ->  v6.2-rc5
 	# stable kernel:    6.1.7      ->  v6.1.7
-	version_tag=v$(echo "${KERNELVERSION}" | sed -E 's/^([0-9]+\.[0-9]+)\.0(.*)$/\1\2/')
+	version_tag=v$(echo "${KERNELVERSION}" | sed -E 's/^([0-9]+\.[0-9]+)\.0(.*)$/\1\2/')${config_localversion}
 
 	# try_tag initializes count if the tag is usable.
 	count=
@@ -190,9 +188,6 @@ if ! test -e include/config/auto.conf; then
 	echo "Error: kernelrelease not valid - run 'make prepare' to update it" >&2
 	exit 1
 fi
-
-# version string from CONFIG_LOCALVERSION
-config_localversion=$(sed -n 's/^CONFIG_LOCALVERSION=\(.*\)$/\1/p' include/config/auto.conf)
 
 # scm version string if not at the kernel version tag or at the file_localversion
 if grep -q "^CONFIG_LOCALVERSION_AUTO=y$" include/config/auto.conf; then
