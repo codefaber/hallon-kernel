@@ -7515,6 +7515,9 @@ void rtw89_core_fill_txdesc_fwcmd_v2(struct rtw89_dev *rtwdev,
 				     void *txdesc);
 u8 rtw89_core_get_ch_dma(struct rtw89_dev *rtwdev, u8 qsel);
 u8 rtw89_core_get_ch_dma_v1(struct rtw89_dev *rtwdev, u8 qsel);
+#ifdef CONFIG_HALLON_BACKPORTS
+u8 rtw89_core_get_ch_dma_v2(struct rtw89_dev *rtwdev, u8 qsel);
+#endif
 void rtw89_core_rx(struct rtw89_dev *rtwdev,
 		   struct rtw89_rx_desc_info *desc_info,
 		   struct sk_buff *skb);

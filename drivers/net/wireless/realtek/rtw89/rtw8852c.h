@@ -11,7 +11,12 @@
 #define BB_PATH_NUM_8852C 2
 
 struct rtw8852c_u_efuse {
+#ifdef CONFIG_HALLON_BACKPORTS
+	/* The USB efuse MAC sits at offset 0x88 (matches newer upstream). */
+	u8 rsvd[0x88];
+#else
 	u8 rsvd[0x38];
+#endif
 	u8 mac_addr[ETH_ALEN];
 };
 

@@ -967,6 +967,20 @@ struct rtw89_mac_size_set {
 	const struct rtw89_ple_quota ple_qt_52b_wow;
 	const struct rtw89_ple_quota ple_qt_52bt_wow;
 	const struct rtw89_ple_quota ple_qt_51b_wow;
+#ifdef CONFIG_HALLON_BACKPORTS
+	/* 8852C USB2.0 SCC */
+	const struct rtw89_dle_size wde_size31;
+	const struct rtw89_dle_size ple_size34;
+	const struct rtw89_wde_quota wde_qt31;
+	const struct rtw89_ple_quota ple_qt78;
+	const struct rtw89_ple_quota ple_qt79;
+	/* 8852C USB3.0 SCC */
+	const struct rtw89_dle_size wde_size17;
+	const struct rtw89_dle_size ple_size17;
+	const struct rtw89_wde_quota wde_qt16;
+	const struct rtw89_ple_quota ple_qt42;
+	const struct rtw89_ple_quota ple_qt43;
+#endif
 	const struct rtw89_rsvd_quota ple_rsvd_qt0;
 	const struct rtw89_rsvd_quota ple_rsvd_qt1;
 	const struct rtw89_dle_rsvd_size rsvd0_size0;

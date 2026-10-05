@@ -1744,6 +1744,20 @@ const struct rtw89_mac_size_set rtw89_mac_size = {
 	.ple_rsvd_qt1 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,},
 	.rsvd0_size0 = {212992, 0,},
 	.rsvd1_size0 = {587776, 2048,},
+#ifdef CONFIG_HALLON_BACKPORTS
+	/* 8852C USB2.0 SCC */
+	.wde_size31 = {RTW89_WDE_PG_64, 384, 0,},
+	.ple_size34 = {RTW89_PLE_PG_128, 3374, 18,},
+	.wde_qt31 = {338, 6, 0, 40,},
+	.ple_qt78 = {1560, 0, 16, 48, 13, 13, 390, 0, 32, 38, 8, 16, 0,},
+	.ple_qt79 = {1560, 0, 32, 48, 1253, 13, 1630, 0, 1272, 38, 120, 1256, 0,},
+	/* 8852C USB3.0 SCC */
+	.wde_size17 = {RTW89_WDE_PG_64, 354, 30,},
+	.ple_size17 = {RTW89_PLE_PG_128, 3368, 24,},
+	.wde_qt16 = {344, 2, 0, 8,},
+	.ple_qt42 = {1068, 0, 16, 48, 4, 13, 178, 0, 16, 1, 8, 16, 0,},
+	.ple_qt43 = {3068, 0, 32, 48, 4, 13, 178, 0, 16, 1, 8, 16, 0,},
+#endif
 };
 EXPORT_SYMBOL(rtw89_mac_size);
 
@@ -1902,7 +1916,11 @@ static u32 dle_expected_used_size(struct rtw89_dev *rtwdev,
 {
 	u32 size = rtwdev->chip->fifo_size;
 
+#ifdef CONFIG_HALLON_BACKPORTS
+	if (mode == RTW89_QTA_SCC && rtwdev->hci.type != RTW89_HCI_TYPE_USB)
+#else
 	if (mode == RTW89_QTA_SCC)
+#endif
 		size -= rtwdev->chip->dle_scc_rsvd_size;
 
 	return size;
@@ -2323,8 +2341,14 @@ static int sec_eng_init_ax(struct rtw89_dev *rtwdev)
 	val |= (B_AX_MC_DEC | B_AX_BC_DEC);
 	if (chip->chip_id == RTL8852C)
 		val |= B_AX_UC_MGNT_DEC;
+#ifdef CONFIG_HALLON_BACKPORTS
+	if (chip->chip_id == RTL8852A || chip->chip_id == RTL8852B ||
+	    chip->chip_id == RTL8851B ||
+	    (chip->chip_id == RTL8852C && rtwdev->hci.type == RTW89_HCI_TYPE_USB))
+#else
 	if (chip->chip_id == RTL8852A || chip->chip_id == RTL8852B ||
 	    chip->chip_id == RTL8851B)
+#endif
 		val &= ~B_AX_TX_PARTIAL_MODE;
 	rtw89_write32(rtwdev, R_AX_SEC_ENG_CTRL, val);
 
@@ -3985,8 +4009,19 @@ static void rtw89_mac_dmac_func_pre_en_ax(struct rtw89_dev *rtwdev)
 
 	val = rtw89_read32(rtwdev, R_AX_HAXI_INIT_CFG1);
 	val &= ~(B_AX_DMA_MODE_MASK | B_AX_STOP_AXI_MST);
+#ifdef CONFIG_HALLON_BACKPORTS
+	val |= B_AX_TXHCI_EN_V1 | B_AX_RXHCI_EN_V1;
+
+	if (rtwdev->hci.type == RTW89_HCI_TYPE_PCIE)
+		val |= FIELD_PREP(B_AX_DMA_MODE_MASK, DMA_MOD_PCIE_1B);
+	else if (rtwdev->hci.type == RTW89_HCI_TYPE_USB)
+		val |= FIELD_PREP(B_AX_DMA_MODE_MASK, DMA_MOD_USB);
+	else
+		val |= FIELD_PREP(B_AX_DMA_MODE_MASK, DMA_MOD_SDIO);
+#else
 	val |= FIELD_PREP(B_AX_DMA_MODE_MASK, DMA_MOD_PCIE_1B) |
 	       B_AX_TXHCI_EN_V1 | B_AX_RXHCI_EN_V1;
+#endif
 	rtw89_write32(rtwdev, R_AX_HAXI_INIT_CFG1, val);
 
 	rtw89_write32_clr(rtwdev, R_AX_HAXI_DMA_STOP1,

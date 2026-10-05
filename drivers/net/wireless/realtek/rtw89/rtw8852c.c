@@ -64,6 +64,76 @@ static const struct rtw89_dle_mem rtw8852c_dle_mem_pcie[] = {
 			       NULL},
 };
 
+#ifdef CONFIG_HALLON_BACKPORTS
+static const struct rtw89_hfc_ch_cfg rtw8852c_hfc_chcfg_usb[] = {
+	{18, 344, grp_0}, /* ACH 0 */
+	{0, 0, grp_0}, /* ACH 1 */
+	{18, 344, grp_0}, /* ACH 2 */
+	{0, 0, grp_0}, /* ACH 3 */
+	{18, 344, grp_0}, /* ACH 4 */
+	{0, 0, grp_0}, /* ACH 5 */
+	{18, 344, grp_0}, /* ACH 6 */
+	{0, 0, grp_0}, /* ACH 7 */
+	{18, 344, grp_0}, /* B0MGQ */
+	{0, 0, grp_0}, /* B0HIQ */
+	{18, 344, grp_0}, /* B1MGQ */
+	{0, 0, grp_0}, /* B1HIQ */
+	{0, 0, 0} /* FWCMDQ */
+};
+
+static const struct rtw89_hfc_pub_cfg rtw8852c_hfc_pubcfg_usb = {
+	344, /* Group 0 */
+	0, /* Group 1 */
+	344, /* Public Max */
+	0 /* WP threshold */
+};
+
+static const struct rtw89_hfc_prec_cfg rtw8852c_hfc_preccfg_usb = {
+	9, /* CH 0-11 pre-cost */
+	32, /* H2C pre-cost */
+	146, /* WP CH 0-7 pre-cost */
+	146, /* WP CH 8-11 pre-cost */
+	1, /* CH 0-11 full condition */
+	1, /* H2C full condition */
+	1, /* WP CH 0-7 full condition */
+	1, /* WP CH 8-11 full condition */
+};
+
+static const struct rtw89_hfc_param_ini rtw8852c_hfc_param_ini_usb[] = {
+	[RTW89_QTA_SCC] = {rtw8852c_hfc_chcfg_usb, &rtw8852c_hfc_pubcfg_usb,
+			   &rtw8852c_hfc_preccfg_usb, RTW89_HCIFC_STF},
+	[RTW89_QTA_DLFW] = {NULL, NULL,
+			    &rtw8852c_hfc_preccfg_usb, RTW89_HCIFC_STF},
+	[RTW89_QTA_INVALID] = {NULL},
+};
+
+static const struct rtw89_dle_mem rtw8852c_dle_mem_usb2[] = {
+	[RTW89_QTA_SCC] = {RTW89_QTA_SCC, &rtw89_mac_size.wde_size31,
+			   &rtw89_mac_size.ple_size34, &rtw89_mac_size.wde_qt31,
+			   &rtw89_mac_size.wde_qt31, &rtw89_mac_size.ple_qt78,
+			   &rtw89_mac_size.ple_qt79},
+	[RTW89_QTA_DLFW] = {RTW89_QTA_DLFW, &rtw89_mac_size.wde_size18,
+			    &rtw89_mac_size.ple_size18, &rtw89_mac_size.wde_qt17,
+			    &rtw89_mac_size.wde_qt17, &rtw89_mac_size.ple_qt44,
+			    &rtw89_mac_size.ple_qt45},
+	[RTW89_QTA_INVALID] = {RTW89_QTA_INVALID, NULL, NULL, NULL, NULL, NULL,
+			       NULL},
+};
+
+static const struct rtw89_dle_mem rtw8852c_dle_mem_usb3[] = {
+	[RTW89_QTA_SCC] = {RTW89_QTA_SCC, &rtw89_mac_size.wde_size17,
+			   &rtw89_mac_size.ple_size17, &rtw89_mac_size.wde_qt16,
+			   &rtw89_mac_size.wde_qt16, &rtw89_mac_size.ple_qt42,
+			   &rtw89_mac_size.ple_qt43},
+	[RTW89_QTA_DLFW] = {RTW89_QTA_DLFW, &rtw89_mac_size.wde_size18,
+			    &rtw89_mac_size.ple_size18, &rtw89_mac_size.wde_qt17,
+			    &rtw89_mac_size.wde_qt17, &rtw89_mac_size.ple_qt44,
+			    &rtw89_mac_size.ple_qt45},
+	[RTW89_QTA_INVALID] = {RTW89_QTA_INVALID, NULL, NULL, NULL, NULL, NULL,
+			       NULL},
+};
+#endif
+
 static const u32 rtw8852c_h2c_regs[RTW89_H2CREG_MAX] = {
 	R_AX_H2CREG_DATA0_V1, R_AX_H2CREG_DATA1_V1, R_AX_H2CREG_DATA2_V1,
 	R_AX_H2CREG_DATA3_V1
@@ -214,7 +284,12 @@ static int rtw8852c_pwr_on_func(struct rtw89_dev *rtwdev)
 	int ret;
 
 	val32 = rtw89_read32_mask(rtwdev, R_AX_SYS_STATUS1, B_AX_PAD_HCI_SEL_V2_MASK);
+#ifdef CONFIG_HALLON_BACKPORTS
+	if (val32 == MAC_AX_HCI_SEL_PCIE_USB ||
+	    rtwdev->hci.type == RTW89_HCI_TYPE_USB)
+#else
 	if (val32 == MAC_AX_HCI_SEL_PCIE_USB)
+#endif
 		rtw89_write32_set(rtwdev, R_AX_LDO_AON_CTRL0, B_AX_PD_REGU_L);
 
 	rtw89_write32_clr(rtwdev, R_AX_SYS_PW_CTRL, B_AX_AFSM_WLSUS_EN |
@@ -246,6 +321,9 @@ static int rtw8852c_pwr_on_func(struct rtw89_dev *rtwdev)
 	rtw89_write8_clr(rtwdev, R_AX_PLATFORM_ENABLE, B_AX_PLATFORM_EN);
 
 	rtw89_write8_set(rtwdev, R_AX_PLATFORM_ENABLE, B_AX_PLATFORM_EN);
+#ifdef CONFIG_HALLON_BACKPORTS
+	if (rtwdev->hci.type == RTW89_HCI_TYPE_PCIE)
+#endif
 	rtw89_write32_clr(rtwdev, R_AX_SYS_SDIO_CTRL, B_AX_PCIE_CALIB_EN_V1);
 
 	rtw89_write32_clr(rtwdev, R_AX_SYS_ISO_CTRL_EXTEND, B_AX_CMAC1_FEN);
@@ -305,6 +383,9 @@ static int rtw8852c_pwr_on_func(struct rtw89_dev *rtwdev)
 
 	rtw89_write32_clr(rtwdev, R_AX_SYS_ISO_CTRL, B_AX_PWC_EV2EF_B14);
 	rtw89_write32_clr(rtwdev, R_AX_PMC_DBG_CTRL2, B_AX_SYSON_DIS_PMCR_AX_WRMSK);
+#ifdef CONFIG_HALLON_BACKPORTS
+	if (rtwdev->hci.type == RTW89_HCI_TYPE_PCIE)
+#endif
 	rtw89_write32_set(rtwdev, R_AX_GPIO0_15_EECS_EESK_LED1_PULL_LOW_EN,
 			  B_AX_EECS_PULL_LOW_EN | B_AX_EESK_PULL_LOW_EN |
 			  B_AX_LED1_PULL_LOW_EN);
@@ -385,12 +466,34 @@ static int rtw8852c_pwr_off_func(struct rtw89_dev *rtwdev)
 	if (ret)
 		return ret;
 
+#ifdef CONFIG_HALLON_BACKPORTS
+	if (rtwdev->hci.type == RTW89_HCI_TYPE_PCIE) {
+		rtw89_write32(rtwdev, R_AX_WLLPS_CTRL, SW_LPS_OPTION);
+	} else if (rtwdev->hci.type == RTW89_HCI_TYPE_USB) {
+		rtw89_write32_clr(rtwdev, R_AX_SYS_PW_CTRL, B_AX_SOP_EDSWR);
+	}
+
+	rtw89_write32_clr(rtwdev, R_AX_SYS_PW_CTRL, B_AX_XTAL_OFF_A_DIE);
+	rtw89_write32_set(rtwdev, R_AX_SYS_SWR_CTRL1, B_AX_SYM_CTRL_SPS_PWMFREQ);
+	rtw89_write32_mask(rtwdev, R_AX_SPS_DIG_ON_CTRL0,
+			   B_AX_REG_ZCDC_H_MASK, 0x3);
+
+	if (rtwdev->hci.type == RTW89_HCI_TYPE_PCIE) {
+		rtw89_write32_set(rtwdev, R_AX_SYS_PW_CTRL, B_AX_APFM_SWLPS);
+	} else if (rtwdev->hci.type == RTW89_HCI_TYPE_USB) {
+		val32 = rtw89_read32(rtwdev, R_AX_SYS_PW_CTRL);
+		val32 &= ~B_AX_AFSM_PCIE_SUS_EN;
+		val32 |= B_AX_AFSM_WLSUS_EN;
+		rtw89_write32(rtwdev, R_AX_SYS_PW_CTRL, val32);
+	}
+#else
 	rtw89_write32(rtwdev, R_AX_WLLPS_CTRL, SW_LPS_OPTION);
 	rtw89_write32_set(rtwdev, R_AX_SYS_PW_CTRL, B_AX_XTAL_OFF_A_DIE);
 	rtw89_write32_set(rtwdev, R_AX_SYS_SWR_CTRL1, B_AX_SYM_CTRL_SPS_PWMFREQ);
 	rtw89_write32_mask(rtwdev, R_AX_SPS_DIG_ON_CTRL0,
 			   B_AX_REG_ZCDC_H_MASK, 0x3);
 	rtw89_write32_set(rtwdev, R_AX_SYS_PW_CTRL, B_AX_APFM_SWLPS);
+#endif
 
 	return 0;
 }
@@ -513,6 +616,13 @@ static int rtw8852c_read_efuse(struct rtw89_dev *rtwdev, u8 *log_map,
 	case RTW89_HCI_TYPE_PCIE:
 		rtw8852c_e_efuse_parsing(efuse, map);
 		break;
+#ifdef CONFIG_HALLON_BACKPORTS
+	case RTW89_HCI_TYPE_USB:
+		ether_addr_copy(efuse->addr, map->u.mac_addr);
+		efuse->rfe_type = map->rfe_type;
+		efuse->xtal_cap = map->xtal_k;
+		break;
+#endif
 	default:
 		return -ENOTSUPP;
 	}
@@ -2921,6 +3031,16 @@ static const struct wiphy_wowlan_support rtw_wowlan_stub_8852c = {
 };
 #endif
 
+#ifdef CONFIG_HALLON_BACKPORTS
+static u8 rtw8852c_get_ch_dma(struct rtw89_dev *rtwdev, u8 qsel)
+{
+	if (rtwdev->hci.type == RTW89_HCI_TYPE_USB)
+		return rtw89_core_get_ch_dma_v2(rtwdev, qsel);
+
+	return rtw89_core_get_ch_dma(rtwdev, qsel);
+}
+#endif
+
 static const struct rtw89_chip_ops rtw8852c_chip_ops = {
 	.enable_bb_rf		= rtw8852c_mac_enable_bb_rf,
 	.disable_bb_rf		= rtw8852c_mac_disable_bb_rf,
@@ -2962,7 +3082,11 @@ static const struct rtw89_chip_ops rtw8852c_chip_ops = {
 	.query_rxdesc		= rtw89_core_query_rxdesc,
 	.fill_txdesc		= rtw89_core_fill_txdesc_v1,
 	.fill_txdesc_fwcmd	= rtw89_core_fill_txdesc_fwcmd_v1,
+#ifdef CONFIG_HALLON_BACKPORTS
+	.get_ch_dma		= rtw8852c_get_ch_dma,
+#else
 	.get_ch_dma		= rtw89_core_get_ch_dma,
+#endif
 	.cfg_ctrl_path		= rtw89_mac_cfg_ctrl_path_v1,
 	.mac_cfg_gnt		= rtw89_mac_cfg_gnt_v1,
 	.stop_sch_tx		= rtw89_mac_stop_sch_tx_v1,
@@ -3006,8 +3130,15 @@ const struct rtw89_chip_info rtw8852c_chip_info = {
 	.max_amsdu_limit	= 8000,
 	.dis_2g_40m_ul_ofdma	= false,
 	.rsvd_ple_ofst		= 0x6f800,
+#ifdef CONFIG_HALLON_BACKPORTS
+	.hfc_param_ini		= {rtw8852c_hfc_param_ini_pcie,
+				   rtw8852c_hfc_param_ini_usb, NULL},
+	.dle_mem		= {rtw8852c_dle_mem_pcie,
+				   rtw8852c_dle_mem_usb2, rtw8852c_dle_mem_usb3, NULL},
+#else
 	.hfc_param_ini		= {rtw8852c_hfc_param_ini_pcie, NULL, NULL},
 	.dle_mem		= {rtw8852c_dle_mem_pcie, NULL, NULL, NULL},
+#endif
 	.wde_qempty_acq_grpnum	= 16,
 	.wde_qempty_mgq_grpsel	= 16,
 	.rf_base_addr		= {0xe000, 0xf000},

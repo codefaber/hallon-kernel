@@ -188,6 +188,32 @@ static u8 rtw89_usb_get_bulkout_id(u8 ch_dma)
 	}
 }
 
+#ifdef CONFIG_HALLON_BACKPORTS
+static u8 rtw89_usb_get_bulkout_id_8852c(u8 ch_dma)
+{
+	switch (ch_dma) {
+	case RTW89_DMA_ACH0:
+		return 3;
+	case RTW89_DMA_ACH2:
+		return 5;
+	case RTW89_DMA_ACH4:
+		return 4;
+	case RTW89_DMA_ACH6:
+		return 6;
+	case RTW89_DMA_B0MG:
+	case RTW89_DMA_B0HI:
+		return 0;
+	case RTW89_DMA_B1MG:
+	case RTW89_DMA_B1HI:
+		return 1;
+	case RTW89_DMA_H2C:
+		return 2;
+	default:
+		return 0;
+	}
+}
+#endif
+
 static void rtw89_usb_write_port_complete(struct urb *urb)
 {
 	struct rtw89_usb_tx_ctrl_block *txcb = urb->context;
@@ -251,7 +277,13 @@ static int rtw89_usb_write_port(struct rtw89_dev *rtwdev, u8 ch_dma,
 	struct rtw89_usb *rtwusb = rtw89_usb_priv(rtwdev);
 	struct usb_device *usbd = rtwusb->udev;
 	struct urb *urb;
+#ifdef CONFIG_HALLON_BACKPORTS
+	u8 bulkout_id = rtwdev->chip->chip_id == RTL8852C ?
+			rtw89_usb_get_bulkout_id_8852c(ch_dma) :
+			rtw89_usb_get_bulkout_id(ch_dma);
+#else
 	u8 bulkout_id = rtw89_usb_get_bulkout_id(ch_dma);
+#endif
 	unsigned int pipe;
 	int ret;
 
@@ -701,6 +733,25 @@ static int rtw89_usb_ops_mac_pre_init(struct rtw89_dev *rtwdev)
 {
 	u32 val32;
 
+#ifdef CONFIG_HALLON_BACKPORTS
+	if (rtwdev->chip->chip_id == RTL8852C) {
+		rtw89_write32_set(rtwdev, R_AX_USB_HOST_REQUEST_2_V1,
+				  B_AX_R_USBIO_MODE);
+
+		rtw89_write32_clr(rtwdev, R_AX_USB_WLAN0_1_V1,
+				  B_AX_USBRX_RST | B_AX_USBTX_RST);
+
+		val32 = rtw89_read32(rtwdev, R_AX_HCI_FUNC_EN_V1);
+		val32 &= ~(B_AX_HCI_RXDMA_EN | B_AX_HCI_TXDMA_EN);
+		rtw89_write32(rtwdev, R_AX_HCI_FUNC_EN_V1, val32);
+
+		val32 |= B_AX_HCI_RXDMA_EN | B_AX_HCI_TXDMA_EN;
+		rtw89_write32(rtwdev, R_AX_HCI_FUNC_EN_V1, val32);
+
+		return 0;
+	}
+#endif
+
 	rtw89_write32_set(rtwdev, R_AX_USB_HOST_REQUEST_2, B_AX_R_USBIO_MODE);
 
 	/* fix USB IO hang suggest by chihhanli@realtek.com */
@@ -728,6 +779,33 @@ static int rtw89_usb_ops_mac_post_init(struct rtw89_dev *rtwdev)
 	struct rtw89_usb *rtwusb = rtw89_usb_priv(rtwdev);
 	enum usb_device_speed speed;
 	u32 ep;
+
+#ifdef CONFIG_HALLON_BACKPORTS
+	if (rtwdev->chip->chip_id == RTL8852C) {
+		rtw89_write32_clr(rtwdev, R_AX_USB3_MAC_NPI_CONFIG_INTF_0_V1,
+				  B_AX_SSPHY_LFPS_FILTER);
+
+		speed = rtwusb->udev->speed;
+
+		if (speed == USB_SPEED_SUPER)
+			rtw89_write8(rtwdev, R_AX_RXDMA_SETTING, USB3_BULKSIZE);
+		else if (speed == USB_SPEED_HIGH)
+			rtw89_write8(rtwdev, R_AX_RXDMA_SETTING, USB2_BULKSIZE);
+		else
+			rtw89_write8(rtwdev, R_AX_RXDMA_SETTING, USB11_BULKSIZE);
+
+		for (ep = 5; ep <= 12; ep++) {
+			if (ep == 8)
+				continue;
+
+			rtw89_write8_mask(rtwdev, R_AX_USB_ENDPOINT_0_V1,
+					  B_AX_EP_IDX, ep);
+			rtw89_write8(rtwdev, R_AX_USB_ENDPOINT_2_V1 + 1, NUMP);
+		}
+
+		return 0;
+	}
+#endif
 
 	rtw89_write32_clr(rtwdev, R_AX_USB3_MAC_NPI_CONFIG_INTF_0,
 			  B_AX_SSPHY_LFPS_FILTER);
