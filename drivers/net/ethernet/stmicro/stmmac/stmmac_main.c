@@ -3050,8 +3050,17 @@ static int stmmac_init_dma_engine(struct stmmac_priv *priv)
 
 	ret = stmmac_reset(priv, priv->ioaddr);
 	if (ret) {
+#ifdef CONFIG_HALLON_ROCKCHIP
+		/* RK3288 GMAC: the DMA reset fails spuriously, but the device still works
+		 * with reduced throughput (Armbian PR #8515).
+		 */
+		netdev_warn(priv->dev,
+				"Failed to reset the dma, device will work with reduced throughput\n");
+		ret = 0;
+#else
 		netdev_err(priv->dev, "Failed to reset the dma\n");
 		return ret;
+#endif
 	}
 
 	/* DMA Configuration */

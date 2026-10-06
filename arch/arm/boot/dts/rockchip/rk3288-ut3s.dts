@@ -1,0 +1,582 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Ugoos UT3s (Rockchip RK3288) TV-box
+ *
+ */
+/dts-v1/;
+#include "rk3288.dtsi"
+#include <dt-bindings/input/input.h>
+
+/ {
+	model = "Ugoos UT3s";
+	compatible = "ugoos,ut3s", "rockchip,rk3288";
+
+	/*
+	 * The MMC core derives the block-device index from the "mmc*" aliases
+	 * (of_alias_get_id "mmc"); rk3288.dtsi only provides the legacy "mshc*"
+	 * aliases, so without these the index falls back to probe order and the
+	 * SD card's mmcblkN number flips between boots.
+	 * Pin it: emmc=0, SD=1, SDIO/Wi-Fi=2.
+	 */
+	aliases {
+		mmc0 = &emmc;
+		mmc1 = &sdmmc;
+		mmc2 = &sdio0;
+		mmc3 = &sdio1;
+	};
+
+	chosen {
+		/* Vendor FIQ debugger was on UART2 (serial-id 0x02). */
+		stdout-path = "serial2:115200n8";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x80000000>;
+	};
+
+	sound {
+		compatible = "simple-audio-card";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,name = "HDMI";
+		simple-audio-card,mclk-fs = <512>;
+
+		simple-audio-card,codec {
+			sound-dai = <&hdmi>;
+		};
+
+		simple-audio-card,cpu {
+			sound-dai = <&i2s>;
+		};
+	};
+
+	ext_gmac: external-gmac-clock {
+		compatible = "fixed-clock";
+		clock-frequency = <125000000>;
+		clock-output-names = "ext_gmac";
+		#clock-cells = <0>;
+	};
+
+	/* Factory LAN MAC, read from the Rockchip IDB (loader block) by the
+	 * rockchip-idb-mac nvmem driver. */
+	idb_mac: idb-mac {
+		compatible = "rockchip,rk3288-idb-mac";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		mac_address: mac-address@0 {
+			reg = <0x0 0x6>;
+		};
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		autorepeat;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pwrbtn>;
+
+		power {
+			gpios = <&gpio0 RK_PA5 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_POWER>;
+			label = "Power";
+			linux,input-type = <1>;
+			wakeup-source;
+			debounce-interval = <100>;
+		};
+	};
+
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		power {
+			gpios = <&gpio8 RK_PA3 GPIO_ACTIVE_LOW>;
+			label = "power";
+			default-state = "on";
+		};
+	};
+
+	fan: gpio-fan {
+		compatible = "gpio-fan";
+		gpios = <&gpio8 RK_PB1 GPIO_ACTIVE_HIGH>;
+		/* On/off fan; RPM value is a nominal placeholder. */
+		gpio-fan,speed-map = <0 0>, <10000 1>;
+		#cooling-cells = <2>;
+		status = "okay";
+	};
+
+	vcc_sys: regulator-vsys {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_sys";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vcc_host: regulator-vcc-host {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_host";
+		enable-active-high;
+		gpio = <&gpio0 RK_PB6 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&host_vbus_drv>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	/* USB OTG VBUS switch; same polarity change as vcc_host above. */
+	vcc_otg: regulator-vcc-otg {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_otg";
+		enable-active-high;
+		gpio = <&gpio0 RK_PB4 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&otg_vbus_drv>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vcc_wifi: regulator-vcc-wifi {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_wifi";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		enable-active-high;
+		gpio = <&gpio4 RK_PD4 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&wifi_en>;
+		startup-delay-us = <100000>;
+		vin-supply = <&vcc_io>;
+	};
+};
+
+&cpu0 {
+	cpu0-supply = <&vdd_cpu>;
+};
+
+&emmc {
+	bus-width = <8>;
+	cap-mmc-highspeed;
+	disable-wp;
+	non-removable;
+	pinctrl-names = "default";
+	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_pwr &emmc_bus8>;
+	status = "okay";
+};
+
+&gmac {
+	assigned-clocks = <&cru SCLK_MAC>;
+	assigned-clock-parents = <&ext_gmac>;
+	clock_in_out = "input";
+	phy-mode = "rgmii";
+	pinctrl-names = "default";
+	pinctrl-0 = <&rgmii_pins>;
+	snps,reset-gpio = <&gpio4 RK_PB0 GPIO_ACTIVE_HIGH>;
+	snps,reset-active-low;
+	snps,reset-delays-us = <0 10000 1000000>;
+	tx_delay = <0x30>;
+	rx_delay = <0x26>;
+	nvmem-cells = <&mac_address>;
+	nvmem-cell-names = "mac-address";
+	status = "okay";
+};
+
+&gpu {
+	mali-supply = <&vdd_gpu>;
+	status = "okay";
+};
+
+&hdmi {
+	ddc-i2c-bus = <&i2c5>;
+	status = "okay";
+};
+
+/* HDMI DDC (monitor EDID) bus. */
+&i2c5 {
+	status = "okay";
+};
+
+&i2c0 {
+	clock-frequency = <400000>;
+	status = "okay";
+
+	vdd_cpu: syr827@40 {
+		compatible = "silergy,syr827";
+		fcs,suspend-voltage-selector = <1>;
+		reg = <0x40>;
+		regulator-name = "vdd_cpu";
+		regulator-min-microvolt = <712500>;
+		regulator-max-microvolt = <1500000>;
+		regulator-always-on;
+		regulator-boot-on;
+		vin-supply = <&vcc_sys>;
+	};
+
+	vdd_gpu: syr828@41 {
+		compatible = "silergy,syr828";
+		fcs,suspend-voltage-selector = <1>;
+		reg = <0x41>;
+		regulator-name = "vdd_gpu";
+		regulator-min-microvolt = <712500>;
+		regulator-max-microvolt = <1500000>;
+		regulator-always-on;
+		regulator-boot-on;
+		vin-supply = <&vcc_sys>;
+	};
+
+	rtc@51 {
+		compatible = "haoyu,hym8563";
+		reg = <0x51>;
+
+		interrupt-parent = <&gpio0>;
+		interrupts = <RK_PA4 IRQ_TYPE_EDGE_FALLING>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&pmic_int>;
+
+		#clock-cells = <0>;
+		clock-output-names = "xin32k";
+	};
+
+	act8846: act8846@5a {
+		compatible = "active-semi,act8846", "act,act8846";
+		reg = <0x5a>;
+		status = "okay";
+
+		vp1-supply = <&vcc_sys>;
+		vp2-supply = <&vcc_sys>;
+		vp3-supply = <&vcc_sys>;
+		vp4-supply = <&vcc_sys>;
+		inl1-supply = <&vcc_io>;
+		inl2-supply = <&vcc_sys>;
+		inl3-supply = <&vcc_20>;
+
+		regulators {
+			vcc_ddr: REG1 {
+				regulator-name = "VCC_DDR";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <1200000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			vcc_io: REG2 {
+				regulator-name = "VCC_IO";
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			vdd_log: REG3 {
+				regulator-name = "VDD_LOG";
+				regulator-min-microvolt = <700000>;
+				regulator-max-microvolt = <1500000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			vcc_20: REG4 {
+				regulator-name = "VCC_20";
+				regulator-min-microvolt = <2000000>;
+				regulator-max-microvolt = <2000000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			vccio_sd: REG5 {
+				regulator-name = "VCCIO_SD";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			/* vendor "act_ldo2", 1.05 V */
+			vcc_10: REG6 {
+				regulator-name = "VCC_10";
+				regulator-min-microvolt = <1050000>;
+				regulator-max-microvolt = <1050000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			/* vendor "act_ldo3", 1.8 V Wi-Fi SDIO reference */
+			vcc_wl: REG7 {
+				regulator-name = "VCC_WL";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			/* vendor "act_ldo4", 3.3 V */
+			vcc_33: REG8 {
+				regulator-name = "VCC_33";
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			/* vendor "act_ldo5", 3.3 V */
+			vccio_pmu: REG9 {
+				regulator-name = "VCCIO_PMU";
+				regulator-min-microvolt = <3300000>;
+				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			/* vendor "act_ldo6", 1.1 V */
+			vdd_11: REG10 {
+				regulator-name = "VDD_11";
+				regulator-min-microvolt = <1100000>;
+				regulator-max-microvolt = <1100000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			/* vendor "vcc_18", 1.8 V */
+			vcc_18: REG11 {
+				regulator-name = "VCC_18";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+
+			/* vendor "act_ldo8", 1.85 V */
+			vcc_185: REG12 {
+				regulator-name = "VCC_185";
+				regulator-min-microvolt = <1850000>;
+				regulator-max-microvolt = <1850000>;
+				regulator-always-on;
+				regulator-boot-on;
+			};
+		};
+	};
+};
+
+&io_domains {
+	status = "okay";
+
+	/* SD card IO rail is the ACT8846 LDO1 (vccio_sd). */
+	sdcard-supply = <&vccio_sd>;
+	/* SDIO0 (Wi-Fi) IO rail is 1.8 V. */
+	wifi-supply = <&vcc_wl>;
+};
+
+&pinctrl {
+	pcfg_pull_none_drv_8ma: pcfg-pull-none-drv-8ma {
+		drive-strength = <8>;
+	};
+
+	pcfg_pull_up_drv_8ma: pcfg-pull-up-drv-8ma {
+		bias-pull-up;
+		drive-strength = <8>;
+	};
+
+	pcfg_pull_none_drv_4ma: pcfg-pull-none-drv-4ma {
+		drive-strength = <4>;
+	};
+
+	pcfg_pull_up_drv_4ma: pcfg-pull-up-drv-4ma {
+		bias-pull-up;
+		drive-strength = <4>;
+	};
+
+	buttons {
+		pwrbtn: pwrbtn {
+			rockchip,pins = <0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+	};
+
+	pmic {
+		pmic_int: pmic-int {
+			rockchip,pins = <0 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+	};
+
+	sdmmc {
+		/*
+		 * Bump SDMMC drive strength to 8 mA as on the EVB reference;
+		 * the default drive strength is marginal for high-speed cards.
+		 */
+		sdmmc_bus4: sdmmc-bus4 {
+			rockchip,pins = <6 RK_PC0 1 &pcfg_pull_up_drv_8ma>,
+					<6 RK_PC1 1 &pcfg_pull_up_drv_8ma>,
+					<6 RK_PC2 1 &pcfg_pull_up_drv_8ma>,
+					<6 RK_PC3 1 &pcfg_pull_up_drv_8ma>;
+		};
+
+		sdmmc_clk: sdmmc-clk {
+			rockchip,pins = <6 RK_PC4 1 &pcfg_pull_none_drv_8ma>;
+		};
+
+		sdmmc_cmd: sdmmc-cmd {
+			rockchip,pins = <6 RK_PC5 1 &pcfg_pull_up_drv_8ma>;
+		};
+	};
+
+	sdio0 {
+		sdio0_bus4: sdio0-bus4 {
+			rockchip,pins = <4 RK_PC4 1 &pcfg_pull_up_drv_8ma>,
+					<4 RK_PC5 1 &pcfg_pull_up_drv_8ma>,
+					<4 RK_PC6 1 &pcfg_pull_up_drv_8ma>,
+					<4 RK_PC7 1 &pcfg_pull_up_drv_8ma>;
+		};
+
+		sdio0_cmd: sdio0-cmd {
+			rockchip,pins = <4 RK_PD0 1 &pcfg_pull_up_drv_8ma>;
+		};
+
+		sdio0_clk: sdio0-clk {
+			rockchip,pins = <4 RK_PD1 1 &pcfg_pull_none_drv_8ma>;
+		};
+	};
+
+	usb {
+		host_vbus_drv: host-vbus-drv {
+			rockchip,pins = <0 RK_PB6 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		otg_vbus_drv: otg-vbus-drv {
+			rockchip,pins = <0 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	wifi {
+		wifi_en: wifi-en {
+			rockchip,pins = <4 RK_PD4 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		/*
+		 * Broadcom OOB host-wake on the SDIO0_INTn pin (GPIO4_PD6), muxed
+		 * to GPIO mode for use as brcmfmac's out-of-band interrupt instead
+		 * of the in-band SDIO interrupt.  Matches the vendor
+		 * WIFI,host_wake_irq = <&gpio4 30 0>.
+		 */
+		wifi_host_wake: wifi-host-wake {
+			rockchip,pins = <4 RK_PD6 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+	};
+};
+
+&sdmmc {
+	bus-width = <4>;
+	cap-mmc-highspeed;
+	cap-sd-highspeed;
+	card-detect-delay = <200>;
+	disable-wp;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
+	status = "okay";
+	vmmc-supply = <&vccio_sd>;
+	vqmmc-supply = <&vccio_sd>;
+};
+
+&sdio0 {
+	bus-width = <4>;
+	cap-sd-highspeed;
+	sd-uhs-sdr104;
+	keep-power-in-suspend;
+	non-removable;
+	max-frequency = <150000000>;
+	rockchip,default-sample-phase = <90>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
+	vmmc-supply = <&vcc_wifi>;
+	vqmmc-supply = <&vcc_wl>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+
+	brcmf: wifi@1 {
+		compatible = "brcm,bcm4329-fmac";
+		reg = <1>;
+		interrupt-parent = <&gpio4>;
+		interrupts = <RK_PD6 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-names = "host-wake";
+		pinctrl-names = "default";
+		pinctrl-0 = <&wifi_host_wake>;
+	};
+};
+
+&tsadc {
+	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
+	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
+	status = "okay";
+};
+
+&cpu_thermal {
+	cooling-maps {
+		map2 {
+			trip = <&cpu_alert1>;
+			cooling-device = <&fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+		};
+	};
+};
+
+/* Bluetooth UART (vendor wiring on UART0 + four control GPIOs).
+ *
+ * Kept as a plain ttyS0: the AP6335/BCM4339 BT is brought up from
+ * userspace with brcm_patchram_plus + hci_ldisc (like the vendor and
+ * the Firefly), not via the hci_bcm serdev driver. The four control
+ * GPIOs (D2/D3/D5/D7) and the RTS handshake are handled by the
+ * userspace power-on script instead. */
+&uart0 {
+	/* The vendor runs this UART in PIO mode (dma-names = "!tx", "!rx"):
+	 * the Broadcom HCI UART does not play well with the 8250 RX/TX DMA. */
+	/delete-property/ dmas;
+	/delete-property/ dma-names;
+	pinctrl-names = "default";
+	/* TX/RX + CTS, matching the Firefly/AP6335 wiring. */
+	pinctrl-0 = <&uart0_xfer &uart0_cts>;
+	status = "okay";
+};
+
+/* Debug/serial console. */
+&uart2 {
+	status = "okay";
+};
+
+/* HDMI audio (I2S0 -> dw-hdmi). */
+&i2s {
+	status = "okay";
+};
+
+&usbphy {
+	status = "okay";
+};
+
+&usb_host0_ehci {
+	status = "okay";
+};
+
+&usb_host1 {
+	status = "okay";
+};
+
+&usb_otg {
+	status = "okay";
+};
+
+&vopb {
+	/delete-property/ iommus;
+	status = "okay";
+};
+
+&vopb_mmu {
+	status = "disabled";
+};
+
+&vopl {
+	/delete-property/ iommus;
+	status = "okay";
+};
+
+&vopl_mmu {
+	status = "disabled";
+};

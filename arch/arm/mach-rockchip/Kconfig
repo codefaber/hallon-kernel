@@ -22,3 +22,19 @@ config ARCH_ROCKCHIP
 	help
 	  Support for Rockchip's Cortex-A9 Single-to-Quad-Core-SoCs
 	  containing the RK2928, RK30xx and RK31xx series.
+
+config HALLON_ROCKCHIP
+	bool "Hallon Rockchip platform workarounds"
+	depends on ARCH_ROCKCHIP
+	help
+	  Enable workarounds required by the Hallon Rockchip platforms
+	  (e.g. Ugoos UT3s, RK3288):
+
+	  - treat a stmmac DMA reset failure as non-fatal (the GMAC keeps
+	    working with reduced throughput),
+	  - disable dwc2 host clock gating so the reset-on-wake PHY quirk
+	    can fire and USB hot-plug works,
+	  - read the factory LAN MAC address from the Rockchip IDB (via the
+	    rockchip-idb-mac nvmem driver) instead of a random address.
+
+	  Say N to keep the kernel upstream-clean.

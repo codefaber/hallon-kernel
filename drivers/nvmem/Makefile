@@ -64,6 +64,7 @@ obj-$(CONFIG_NVMEM_RMEM) 		+= nvmem-rmem.o
 nvmem-rmem-y				:= rmem.o
 obj-$(CONFIG_NVMEM_ROCKCHIP_EFUSE)	+= nvmem_rockchip_efuse.o
 nvmem_rockchip_efuse-y			:= rockchip-efuse.o
+obj-$(CONFIG_HALLON_ROCKCHIP)		+= rockchip-idb-mac.o
 obj-$(CONFIG_NVMEM_ROCKCHIP_OTP)	+= nvmem-rockchip-otp.o
 nvmem-rockchip-otp-y			:= rockchip-otp.o
 obj-$(CONFIG_NVMEM_SC27XX_EFUSE)	+= nvmem-sc27xx-efuse.o

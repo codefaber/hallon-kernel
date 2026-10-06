@@ -948,6 +948,90 @@ static int __init customize_machine(void)
 }
 arch_initcall(customize_machine);
 
+#ifdef CONFIG_HALLON_ROCKCHIP
+#include <linux/clk.h>
+#include <linux/crc32.h>
+#include <linux/io.h>
+
+/*
+ * Recover the stock /proc/cpuinfo serial: a CRC32 hash of the eFuse OTP chip id,
+ * exactly as the vendor rockchip-cpuinfo driver computes it. The chip id is the
+ * 16-byte eFuse cell at offset 0x07 of the RK3288 eFuse (0xffb40000).
+ */
+#define RK3288_EFUSE_BASE	0xffb40000
+#define RK3288_EFUSE_CTRL	0x00
+#define RK3288_EFUSE_DOUT	0x04
+#define RK3288_A_SHIFT		6
+#define RK3288_A_MASK		0x3ff
+#define RK3288_PGENB		BIT(3)
+#define RK3288_LOAD		BIT(2)
+#define RK3288_STROBE		BIT(1)
+#define RK3288_CSB		BIT(0)
+
+static void __init rockchip_efuse_serial(void)
+{
+	struct device_node *np;
+	struct clk *clk;
+	void __iomem *base;
+	u8 efuse_buf[16], buf[16];
+	int i;
+
+	np = of_find_compatible_node(NULL, NULL, "rockchip,rk3288-efuse");
+	if (!np)
+		return;
+
+	clk = of_clk_get_by_name(np, "pclk_efuse");
+	of_node_put(np);
+	if (IS_ERR(clk))
+		return;
+
+	if (clk_prepare_enable(clk)) {
+		clk_put(clk);
+		return;
+	}
+
+	base = ioremap(RK3288_EFUSE_BASE, 0x20);
+	if (!base) {
+		clk_disable_unprepare(clk);
+		clk_put(clk);
+		return;
+	}
+
+	writel(RK3288_LOAD | RK3288_PGENB, base + RK3288_EFUSE_CTRL);
+	udelay(1);
+	for (i = 0; i < 16; i++) {
+		u32 off = 0x07 + i;
+
+		writel(readl(base + RK3288_EFUSE_CTRL) &
+		       (~(RK3288_A_MASK << RK3288_A_SHIFT)),
+		       base + RK3288_EFUSE_CTRL);
+		writel(readl(base + RK3288_EFUSE_CTRL) |
+		       ((off & RK3288_A_MASK) << RK3288_A_SHIFT),
+		       base + RK3288_EFUSE_CTRL);
+		udelay(1);
+		writel(readl(base + RK3288_EFUSE_CTRL) | RK3288_STROBE,
+		       base + RK3288_EFUSE_CTRL);
+		udelay(1);
+		efuse_buf[i] = readb(base + RK3288_EFUSE_DOUT);
+		writel(readl(base + RK3288_EFUSE_CTRL) & ~RK3288_STROBE,
+		       base + RK3288_EFUSE_CTRL);
+		udelay(1);
+	}
+	writel(RK3288_PGENB | RK3288_CSB, base + RK3288_EFUSE_CTRL);
+
+	iounmap(base);
+	clk_disable_unprepare(clk);
+	clk_put(clk);
+
+	for (i = 0; i < 8; i++) {
+		buf[i] = efuse_buf[1 + (i << 1)];
+		buf[i + 8] = efuse_buf[i << 1];
+	}
+	system_serial_low = crc32(0, buf, 8);
+	system_serial_high = crc32(system_serial_low, buf + 8, 8);
+}
+#endif
+
 static int __init init_machine_late(void)
 {
 	struct device_node *root;
@@ -955,6 +1039,10 @@ static int __init init_machine_late(void)
 
 	if (machine_desc->init_late)
 		machine_desc->init_late();
+
+#ifdef CONFIG_HALLON_ROCKCHIP
+	rockchip_efuse_serial();
+#endif
 
 	root = of_find_node_by_path("/");
 	if (root) {
