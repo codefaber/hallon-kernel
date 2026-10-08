@@ -3,7 +3,7 @@
 # Hallon kernel
 
 A long-term-supported Linux kernel for devices that are no longer officially
-maintained by their vendors.
+maintained by their vendors and unofficial alternative for arbitrary hardware.
 
 ## What this project is for
 

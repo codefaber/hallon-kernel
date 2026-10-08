@@ -27,7 +27,7 @@ booted from eMMC or SD via the vendor U-Boot.
 
 - **Hardware video codecs** — H.265 decode and H.264 encode have no mainline driver.
 - **Analog audio / S/PDIF** — no upstream driver for RK1000 codec, S/PDIF isn't wired.
-- **IR receiver** — no upstream driver.
+- **IR receiver and transmitter** — no upstream driver.
 - **Watchdog** — deliberately disabled.
 - **Camera / eDP / LVDS / MIPI DSI** — not fitted on this board.
 
