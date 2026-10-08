@@ -13,7 +13,7 @@ maintained by their vendors.
 
 ## Supported devices
 
-- **Ugoos UT3s** TV-box.
+- **[Ugoos UT3s](Documentation/hallon/ut3s/ut3s.md)** TV-box.
 
 ## Configuration
 
